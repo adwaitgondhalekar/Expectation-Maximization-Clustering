@@ -2,6 +2,7 @@
     "files.associations": {
         "ostream": "cpp",
         "chrono": "cpp",
-        "alignedvector3": "cpp"
+        "alignedvector3": "cpp",
+        "iostream": "cpp"
     }
 }
