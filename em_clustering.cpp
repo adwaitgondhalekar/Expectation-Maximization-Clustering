@@ -27,12 +27,15 @@ using Eigen::VectorXd;
 // vector<vector<float>> covariance_gaussian2;
 // vector<vector<float>> covariance_gaussian3;
 int gaussians = 3;
-
-MatrixXd observation(150, 5);
-MatrixXd observation_unlabelled(150, 4);
-MatrixXd observation_1(50, 4);
-MatrixXd observation_2(50, 4);
-MatrixXd observation_3(50, 4);
+int total_rows = 150;
+int total_columns = 5;
+int iterations = 100;
+double tolerance = pow(10,-3);
+MatrixXd observation(total_rows, total_columns);
+MatrixXd observation_unlabelled(150, (total_columns - 1));
+MatrixXd observation_1(50, (total_columns - 1));
+MatrixXd observation_2(50, (total_columns - 1));
+MatrixXd observation_3(50, (total_columns - 1));
 VectorXd mean_gaussian1;
 VectorXd mean_gaussian2;
 VectorXd mean_gaussian3;
@@ -40,21 +43,27 @@ VectorXd std_dev_gaussian1;
 VectorXd std_dev_gaussian2;
 VectorXd std_dev_gaussian3;
 Vector3d prior_probability;
-MatrixXd gaussian1_covariance(4, 4);
-MatrixXd gaussian2_covariance(4, 4);
-MatrixXd gaussian3_covariance(4, 4);
-VectorXd prob_x_given_gaussian1(150);
-VectorXd prob_x_given_gaussian2(150);
-VectorXd prob_x_given_gaussian3(150);
-VectorXd posterior_prob_gaussian1(150);
-VectorXd posterior_prob_gaussian2(150);
-VectorXd posterior_prob_gaussian3(150);
-VectorXd data_point_weight_gaussian1(150);
-VectorXd data_point_weight_gaussian2(150);
-VectorXd data_point_weight_gaussian3(150);
+MatrixXd gaussian1_covariance((total_columns - 1), (total_columns - 1));
+MatrixXd gaussian2_covariance((total_columns - 1), (total_columns - 1));
+MatrixXd gaussian3_covariance((total_columns - 1), (total_columns - 1));
+VectorXd prob_x_given_gaussian1(total_rows);
+VectorXd prob_x_given_gaussian2(total_rows);
+VectorXd prob_x_given_gaussian3(total_rows);
+VectorXd posterior_prob_gaussian1(total_rows);
+VectorXd posterior_prob_gaussian2(total_rows);
+VectorXd posterior_prob_gaussian3(total_rows);
+VectorXd data_point_weight_gaussian1(total_rows);
+VectorXd data_point_weight_gaussian2(total_rows);
+VectorXd data_point_weight_gaussian3(total_rows);
 double sum_posterior_prob_gaussian1 = 0;
 double sum_posterior_prob_gaussian2 = 0;
 double sum_posterior_prob_gaussian3 = 0;
+VectorXd likelihood_mul_prior_gaussian1(total_rows);
+VectorXd likelihood_mul_prior_gaussian2(total_rows);
+VectorXd likelihood_mul_prior_gaussian3(total_rows);
+double prev_log_likelihood = 0;
+double next_log_likelihood = 0;
+
 int dimensions = 4;
 
 void read_csv_data(string filename)
@@ -73,12 +82,12 @@ void read_csv_data(string filename)
         vector<float> data_point;
         while (getline(is, data, ','))
         {
-            if (params < 4)
+            if (params < (total_columns - 1))
             {
                 observation(obs_no, params) = stod(data);
                 observation_unlabelled(obs_no, params) = stod(data);
             }
-            else if (params == 4)
+            else if (params == (total_columns - 1))
             {
                 if (data.compare("Iris-setosa") == 0)
                     observation(obs_no, params) = 0;
@@ -180,10 +189,10 @@ void initialize_gaussian_priors()
 void get_initial_covariance(MatrixXd m1, int gaussian)
 {
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < (total_columns - 1); i++)
     {
 
-        for (int j = 0; j < 4; j++)
+        for (int j = 0; j < (total_columns - 1); j++)
         {
             switch (gaussian)
             {
@@ -265,6 +274,7 @@ void calculate_posterior_probability(MatrixXd obs, VectorXd prior, VectorXd like
         case 0:
         {
             numerator = likelihood1[i] * prior[gaussian];
+            likelihood_mul_prior_gaussian1(i) = numerator;
             posterior_prob_gaussian1[i] = (numerator / denominator);
             sum_posterior_prob_gaussian1 += posterior_prob_gaussian1[i];
             break;
@@ -273,6 +283,7 @@ void calculate_posterior_probability(MatrixXd obs, VectorXd prior, VectorXd like
         case 1:
         {
             numerator = likelihood2[i] * prior[gaussian];
+            likelihood_mul_prior_gaussian2(i) = numerator;
             posterior_prob_gaussian2[i] = (numerator / denominator);
             sum_posterior_prob_gaussian2 += posterior_prob_gaussian2[i];
             break;
@@ -281,6 +292,7 @@ void calculate_posterior_probability(MatrixXd obs, VectorXd prior, VectorXd like
         case 2:
         {
             numerator = likelihood3[i] * prior[gaussian];
+            likelihood_mul_prior_gaussian3(i) = numerator;
             posterior_prob_gaussian3[i] = (numerator / denominator);
             sum_posterior_prob_gaussian3 += posterior_prob_gaussian3[i];
             break;
@@ -347,7 +359,7 @@ void e_step()
 }
 void re_calculate_mean(MatrixXd data, VectorXd posterior_prob, double total_posterior_prob, int gaussian)
 {
-    MatrixXd new_matrix(150, 4);
+    MatrixXd new_matrix(total_rows, (total_columns - 1));
     for (int i = 0; i < data.rows(); i++)
     {
         new_matrix.row(i) = posterior_prob[i] * (data.row(i));
@@ -476,11 +488,31 @@ void m_step()
 
 
 }
+double get_log_likelihood()
+{
+    // calculating log likelihood
+    double sum=0;
+    for(int i=0;i<observation.rows();i++)
+    {
+        sum+= log10(likelihood_mul_prior_gaussian1(i) + likelihood_mul_prior_gaussian2(i) + likelihood_mul_prior_gaussian3(i));
+    }
+    return sum;
+}
 
+bool check_stopping_condition()
+{
+    double prev_log_likelihood_avg = prev_log_likelihood/(observation.rows());
+    double next_log_likelihood_avg = next_log_likelihood/(observation.rows());
+
+    if(abs(prev_log_likelihood_avg - next_log_likelihood_avg) < tolerance)
+        return true;
+    else
+        return false;
+}
 void shuffle_data()
 {
     srand(time(0));
-    for (int i = 0; i < 150 - 1; i++)
+    for (int i = 0; i < (total_rows - 1); i++)
     {
         int j = i + rand() % (150 - i);
         observation.row(i).swap(observation.row(j));
@@ -508,8 +540,33 @@ int main()
     get_initial_covariance(observation_2, 2);
     get_initial_covariance(observation_3, 3);
 
-    e_step();
-    m_step();
+    for(int i=0;i<iterations;i++)
+    {
+        e_step();
+        if(i==0)
+        {
+            prev_log_likelihood = get_log_likelihood();
+            cout<<"Iteration   "<<i<<"   Log-likelihood - "<<prev_log_likelihood<<endl;
+        }
+        else
+        {
+            next_log_likelihood = get_log_likelihood();
+            cout<<"Iteration   "<<i<<"   Log-likelihood - "<<next_log_likelihood<<endl;
+        }
+            
+        m_step();
+        bool stop = check_stopping_condition();
 
+        if(stop==true)
+            break;
+        else
+        {
+            prev_log_likelihood = next_log_likelihood;
+            next_log_likelihood = 0;
+        }
+    }
+        
+    
+    
     return 0;
 }
