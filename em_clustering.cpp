@@ -55,6 +55,7 @@ VectorXd data_point_weight_gaussian3(150);
 double sum_posterior_prob_gaussian1 = 0;
 double sum_posterior_prob_gaussian2 = 0;
 double sum_posterior_prob_gaussian3 = 0;
+int dimensions = 4;
 
 void read_csv_data(string filename)
 {
@@ -223,24 +224,24 @@ void multivariate_gaussian_distribution(MatrixXd obs, MatrixXd mean, MatrixXd co
         case 0:
         {
             // using formula of multivariate gaussian distribution
-            prob_x_given_gaussian1[obs_no] = pow((sqrt(2 * M_PI * (cov.determinant()))), -1) * (exp((-0.5) * exp_input.value()));
+            prob_x_given_gaussian1[obs_no] = pow((2 * M_PI * (cov.determinant())), -(dimensions / 2)) * (exp((-0.5) * exp_input.value()));
             break;
         }
-            
+
         case 1:
         {
             // using formula of multivariate gaussian distribution
-            prob_x_given_gaussian2[obs_no] = pow((sqrt(2 * M_PI * (cov.determinant()))), -1) * (exp((-0.5) * exp_input.value()));
+            prob_x_given_gaussian2[obs_no] = pow((2 * M_PI * (cov.determinant())), -(dimensions / 2)) * (exp((-0.5) * exp_input.value()));
             break;
         }
-            
+
         case 2:
         {
             // using formula of multivariate gaussian distribution
-            prob_x_given_gaussian3[obs_no] = pow((sqrt(2 * M_PI * (cov.determinant()))), -1) * (exp((-0.5) * exp_input.value()));
+            prob_x_given_gaussian3[obs_no] = pow((2 * M_PI * (cov.determinant())), -(dimensions / 2)) * (exp((-0.5) * exp_input.value()));
             break;
         }
-            
+
         default:
             break;
         }
@@ -292,8 +293,7 @@ void calculate_posterior_probability(MatrixXd obs, VectorXd prior, VectorXd like
 }
 // void calculate_point_weight(VectorXd posterior_prob, int gaussian)
 // {
-    
-    
+
 //     for(int i=0;i<posterior_prob.size();i++)
 //     {
 //         switch (gaussian)
@@ -304,14 +304,14 @@ void calculate_posterior_probability(MatrixXd obs, VectorXd prior, VectorXd like
 //             data_point_weight_gaussian1[i] = posterior_prob[i]/total_weight_gaussian1;
 //             break;
 //         }
-            
+
 //         case 1:
-//         {   
+//         {
 //             total_weight_gaussian2 = posterior_prob.sum();
 //             data_point_weight_gaussian2[i] = posterior_prob[i]/total_weight_gaussian2;
 //             break;
 //         }
-            
+
 //         case 2:
 //         {
 //             total_weight_gaussian3 = posterior_prob.sum();
@@ -347,20 +347,134 @@ void e_step()
 }
 void re_calculate_mean(MatrixXd data, VectorXd posterior_prob, double total_posterior_prob, int gaussian)
 {
-    Vector3d new_mean(0, 0, 0);
-    for(int i=0;i<data.rows();i++)
-    {   
-        cout<<i<<endl;
-        cout<<(posterior_prob[i]*(data.row(i))).transpose()<<endl;
-        
+    MatrixXd new_matrix(150, 4);
+    for (int i = 0; i < data.rows(); i++)
+    {
+        new_matrix.row(i) = posterior_prob[i] * (data.row(i));
     }
+
+    switch (gaussian)
+    {
+    case 0:
+    {
+
+        VectorXd new_mean = (new_matrix.colwise().sum()) / (sum_posterior_prob_gaussian1);
+        mean_gaussian1 = new_mean;
+        break;
+    }
+    case 1:
+    {
+        VectorXd new_mean = (new_matrix.colwise().sum()) / (sum_posterior_prob_gaussian2);
+        mean_gaussian2 = new_mean;
+        break;
+    }
+    case 3:
+    {
+        VectorXd new_mean = (new_matrix.colwise().sum()) / (sum_posterior_prob_gaussian3);
+        mean_gaussian3 = new_mean;
+        break;
+    }
+
+    default:
+        break;
+    }
+}
+
+void re_calculate_covarinces(MatrixXd obs, VectorXd posterior_prob, double total_posterior_prob, int gaussian)
+{
+    MatrixXd new_covariance(observation_unlabelled.cols(), observation_unlabelled.cols());
+    for (int i = 0; i < obs.cols(); i++)
+    {
+        for (int j = 0; j < obs.cols(); j++)
+        {
+            double sum = 0;
+            for (int k = 0; k < obs.rows(); k++)
+            {
+                sum += posterior_prob[k] * obs(k, i) * obs(k, j);
+            }
+            new_covariance(i, j) = sum;
+        }
+    }
+
+    new_covariance = new_covariance/total_posterior_prob;
+
+    switch (gaussian)
+    {
+    case 0:
+        {
+            gaussian1_covariance = new_covariance;
+            break;
+        }
+    case 1:
+        {
+            gaussian2_covariance = new_covariance;
+            break;
+        }
+    case 2:
+        {
+            gaussian3_covariance = new_covariance;
+            break;
+        }
+        
     
+    default:
+        break;
+    }
+}
+
+void re_calculate_prior(double sum_posterior_prob, int gaussian)
+{
+    switch (gaussian)
+    {
+    case 0:
+        {
+            prior_probability[0] = sum_posterior_prob/(observation.rows());
+            break;
+        }
+    case 1:
+        {
+            prior_probability[1] = sum_posterior_prob/(observation.rows());
+            break;
+        }
+    case 2:
+        {
+            prior_probability[2] = sum_posterior_prob/(observation.rows());
+            break;
+        }
+        
+    
+    default:
+        break;
+    }
 }
 void m_step()
 {
     // re - calculating the mean, prior probability and standard deviation for each gaussian
 
     re_calculate_mean(observation_unlabelled, posterior_prob_gaussian1, sum_posterior_prob_gaussian1, 0);
+    re_calculate_mean(observation_unlabelled, posterior_prob_gaussian2, sum_posterior_prob_gaussian2, 1);
+    re_calculate_mean(observation_unlabelled, posterior_prob_gaussian3, sum_posterior_prob_gaussian3, 2);
+
+    // re - calculating the covariance matrix for each gaussian
+
+    // zero mean observations for mean of gaussian 1
+    MatrixXd zero_mean_observations1 = observation_unlabelled.rowwise() - mean_gaussian1.transpose();
+    re_calculate_covarinces(zero_mean_observations1, posterior_prob_gaussian1, sum_posterior_prob_gaussian1, 0);
+
+    MatrixXd zero_mean_observations2 = observation_unlabelled.rowwise() - mean_gaussian2.transpose();
+    re_calculate_covarinces(zero_mean_observations2, posterior_prob_gaussian2, sum_posterior_prob_gaussian2, 1);
+
+    MatrixXd zero_mean_observations3 = observation_unlabelled.rowwise() - mean_gaussian3.transpose();
+    re_calculate_covarinces(zero_mean_observations3, posterior_prob_gaussian3, sum_posterior_prob_gaussian3, 2);
+
+    // // re - calculating the priors for each gaussian
+
+    // re_calculate_prior(sum_posterior_prob_gaussian1, 0);
+    // re_calculate_prior(sum_posterior_prob_gaussian2, 1);
+    // re_calculate_prior(sum_posterior_prob_gaussian3, 2);
+
+
+
 }
 
 void shuffle_data()
@@ -394,10 +508,6 @@ int main()
     get_initial_covariance(observation_2, 2);
     get_initial_covariance(observation_3, 3);
 
-    // cout<<"Covariance matrices"<<endl;
-    // cout<<gaussian1_covariance<<endl;
-    // cout<<gaussian2_covariance<<endl;
-    // cout<<gaussian3_covariance<<endl;
     e_step();
     m_step();
 
