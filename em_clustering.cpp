@@ -29,7 +29,7 @@ using Eigen::VectorXd;
 int gaussians = 3;
 int total_rows = 150;
 int total_columns = 5;
-int iterations = 100;
+int iterations = 4;
 double tolerance = pow(10,-3);
 MatrixXd observation(total_rows, total_columns);
 MatrixXd observation_unlabelled(150, (total_columns - 1));
@@ -63,7 +63,7 @@ VectorXd likelihood_mul_prior_gaussian2(total_rows);
 VectorXd likelihood_mul_prior_gaussian3(total_rows);
 double prev_log_likelihood = 0;
 double next_log_likelihood = 0;
-
+VectorXd predicted_cluster(total_rows);
 int dimensions = 4;
 
 void read_csv_data(string filename)
@@ -225,6 +225,7 @@ void multivariate_gaussian_distribution(MatrixXd obs, MatrixXd mean, MatrixXd co
     for (auto row : obs.rowwise())
     {
         MatrixXd mean_subtracted = row - mean.transpose();
+        cout<<mean_subtracted<<endl;
         MatrixXd product = mean_subtracted * (cov.inverse());
         MatrixXd exp_input = product * (mean_subtracted.transpose());
 
@@ -233,21 +234,21 @@ void multivariate_gaussian_distribution(MatrixXd obs, MatrixXd mean, MatrixXd co
         case 0:
         {
             // using formula of multivariate gaussian distribution
-            prob_x_given_gaussian1[obs_no] = pow((2 * M_PI * (cov.determinant())), -(dimensions / 2)) * (exp((-0.5) * exp_input.value()));
+            prob_x_given_gaussian1[obs_no] = (pow((2 * M_PI),(-dimensions / 2)) * pow((cov.determinant()),(-0.5))) * exp((-0.5) * (exp_input.value()));
             break;
         }
 
         case 1:
         {
             // using formula of multivariate gaussian distribution
-            prob_x_given_gaussian2[obs_no] = pow((2 * M_PI * (cov.determinant())), -(dimensions / 2)) * (exp((-0.5) * exp_input.value()));
+            prob_x_given_gaussian2[obs_no] = (pow((2 * M_PI),(-dimensions / 2)) * pow((cov.determinant()),(-0.5))) * exp((-0.5) * (exp_input.value()));
             break;
         }
 
         case 2:
         {
             // using formula of multivariate gaussian distribution
-            prob_x_given_gaussian3[obs_no] = pow((2 * M_PI * (cov.determinant())), -(dimensions / 2)) * (exp((-0.5) * exp_input.value()));
+            prob_x_given_gaussian3[obs_no] = (pow((2 * M_PI),(-dimensions / 2)) * pow((cov.determinant()),(-0.5))) * exp((-0.5) * (exp_input.value()));
             break;
         }
 
@@ -479,11 +480,11 @@ void m_step()
     MatrixXd zero_mean_observations3 = observation_unlabelled.rowwise() - mean_gaussian3.transpose();
     re_calculate_covarinces(zero_mean_observations3, posterior_prob_gaussian3, sum_posterior_prob_gaussian3, 2);
 
-    // // re - calculating the priors for each gaussian
+    // re - calculating the priors for each gaussian
 
-    // re_calculate_prior(sum_posterior_prob_gaussian1, 0);
-    // re_calculate_prior(sum_posterior_prob_gaussian2, 1);
-    // re_calculate_prior(sum_posterior_prob_gaussian3, 2);
+    re_calculate_prior(sum_posterior_prob_gaussian1, 0);
+    re_calculate_prior(sum_posterior_prob_gaussian2, 1);
+    re_calculate_prior(sum_posterior_prob_gaussian3, 2);
 
 
 
@@ -519,6 +520,89 @@ void shuffle_data()
         observation_unlabelled.row(i).swap(observation_unlabelled.row(j));
     }
 }
+
+int predict_class(VectorXd data_point)
+{
+    MatrixXd mean_subtracted(gaussians, (total_columns - 1));
+    MatrixXd gaussian_means (gaussians, (total_columns - 1));
+    // cout<<"gaussian mean"<<endl;
+    
+    gaussian_means.row(0) = mean_gaussian1.transpose();
+    gaussian_means.row(1) = mean_gaussian2.transpose();
+    gaussian_means.row(2) = mean_gaussian3.transpose();
+
+    for(int i=0;i<mean_subtracted.rows();i++)
+    {
+        if(i==0)
+            mean_subtracted.row(i) = (data_point - mean_gaussian1).transpose();
+        if(i==1)
+            mean_subtracted.row(i) = (data_point - mean_gaussian2).transpose();
+        else
+            mean_subtracted.row(i) = (data_point - mean_gaussian3).transpose();
+    }
+
+
+    VectorXd numerators(gaussians);
+    double denominator = 0;
+    VectorXd posteriors(gaussians);
+    // cout<<mean_subtracted<<endl;
+    // cout<<mean_subtracted.row(0)<<endl;
+    for(int i=0;i<mean_subtracted.rows();i++)
+    {
+        if(i==0)
+        {   
+            VectorXd product = (mean_subtracted.row(i)) * (gaussian1_covariance.inverse()).transpose();
+            // cout<<product<<endl;
+            VectorXd exp_input = (product.transpose()) * (mean_subtracted.row(i).transpose());
+            // cout<<exp_input<<endl;
+            numerators[i] = (pow((2 * M_PI),(-dimensions / 2)) * pow(gaussian1_covariance.determinant(),(-0.5))) * exp((-0.5) * (exp_input.value()));
+            numerators[i] = (numerators[i] * prior_probability[i]);
+            // cout<<numerators[i]<<endl;
+            denominator += numerators[i];
+            // cout<<product<<endl;
+            // cout<<exp_input<<endl;
+        }
+        if(i==1)
+        {   
+            VectorXd product = (mean_subtracted.row(i)) * (gaussian2_covariance.inverse()).transpose();
+            // cout<<product<<endl;
+            VectorXd exp_input = (product.transpose()) * (mean_subtracted.row(i).transpose());
+            numerators[i] = (pow((2 * M_PI),(-dimensions / 2)) * pow(gaussian2_covariance.determinant(),(-0.5))) * exp((-0.5) * (exp_input.value()));
+            numerators[i] = numerators[i] * prior_probability[i];
+            // cout<<numerators[i]<<endl;
+            denominator += numerators[i];
+            // cout<<product<<endl;
+            // cout<<exp_input<<endl;
+        }
+        if(i==2)
+        {   
+            VectorXd product = (mean_subtracted.row(i)) * (gaussian3_covariance.inverse()).transpose();
+            // cout<<product<<endl;
+            VectorXd exp_input = (product.transpose()) * (mean_subtracted.row(i).transpose());
+            numerators[i] = (pow((2 * M_PI),(-dimensions / 2)) * pow(gaussian3_covariance.determinant(),(-0.5))) * exp((-0.5) * (exp_input.value()));
+            numerators[i] = numerators[i] * prior_probability[i];
+            // cout<<numerators[i]<<endl;
+            denominator += numerators[i];
+            // cout<<product<<endl;
+            // cout<<exp_input<<endl;
+        }
+
+    }
+
+    posteriors = (numerators/denominator);
+    cout<<posteriors<<endl;
+    double max_posterior = posteriors.maxCoeff();
+    int assigned_gaussian;
+    for(int i=0;i<gaussians;i++)
+    {
+        if(posteriors[i] == max_posterior)
+            assigned_gaussian = i;
+
+    }
+
+    return assigned_gaussian;
+    
+}
 int main()
 {
     // read data from csv file
@@ -527,6 +611,7 @@ int main()
 
     shuffle_data();
 
+    cout<<observation<<endl;
     // initializing the parameters of the gaussians randomly
 
     assign_points_to_gaussians();
@@ -565,8 +650,13 @@ int main()
             next_log_likelihood = 0;
         }
     }
-        
     
+    for(int i=0;i<observation.rows();i++)
+    {   
+        predicted_cluster[i] = predict_class(observation_unlabelled.row(i));
+    }
+    
+    cout<<predicted_cluster<<endl;
     
     return 0;
 }
