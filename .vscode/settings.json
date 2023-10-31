@@ -3,6 +3,7 @@
         "ostream": "cpp",
         "chrono": "cpp",
         "alignedvector3": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "algorithm": "cpp"
     }
 }

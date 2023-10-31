@@ -8,11 +8,9 @@
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c17",
-            "cppStandard": "gnu++17",
+            "cppStandard": "c++17",
             "intelliSenseMode": "linux-gcc-x64",
-            "compilerArgs": [
-                "\"-I\",\"</home/adwait/eigen>\""
-            ]
+            "compilerArgs": []
         }
     ],
     "version": 4
