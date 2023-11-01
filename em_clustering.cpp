@@ -618,7 +618,7 @@ void get_allotted_cluster()
         else
             allotted_cluster[i] = 2;
     }
-    cout << allotted_cluster.transpose() << endl;
+    // cout << allotted_cluster.transpose() << endl;
 }
 
 void initialize_gaussian_parameters_before_shuffle()
@@ -683,7 +683,7 @@ int main()
         }
     }
     
-    cout<<actual_cluster.transpose()<<endl;
+    // cout<<actual_cluster.transpose()<<endl;
     get_allotted_cluster();
 
     double sum_true_allocations = 0;
@@ -692,7 +692,7 @@ int main()
         if (allotted_cluster[i] == actual_cluster[i])
             sum_true_allocations += 1;
     }
-    cout << sum_true_allocations << endl;
+    cout <<"Data points that we allotted to their true clusters =  "<<sum_true_allocations<<endl;
 
     return 0;
 }
