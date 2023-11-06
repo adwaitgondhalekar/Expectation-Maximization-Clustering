@@ -13,7 +13,7 @@ using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
 
-int dimensions = 4;
+int dimensions = 2;
 int gaussians = 3;
 int total_rows = 150;
 int total_columns = 5;
@@ -55,6 +55,14 @@ double prev_log_likelihood = 0;
 double next_log_likelihood = 0;
 VectorXd actual_cluster(total_rows);
 VectorXd allotted_cluster(total_rows);
+
+vector<int> cluster_1_points;
+vector<int> cluster_2_points;
+vector<int> cluster_3_points;
+
+vector<int> actual_cluster_1_points;
+vector<int> actual_cluster_2_points;
+vector<int> actual_cluster_3_points;
 
 void read_csv_data(string filename)
 {
@@ -623,6 +631,7 @@ void get_allotted_cluster()
 
 void initialize_gaussian_parameters_before_shuffle()
 {
+
     assign_points_to_gaussians();
 
     get_gaussian_initial_mean();
@@ -639,24 +648,57 @@ void initialize_gaussian_parameters_after_shuffle()
     get_initial_covariance();
     initialize_gaussian_priors();
 }
+
+void check_which_formed_cluster_corresponds_to_actual_cluster()
+{
+    // checking for actual cluster 1
+    int match1 = 0, match2 = 0, match3 = 0;
+
+    vector<int> v(actual_cluster_1_points.size() + cluster_1_points.size());
+    vector<int>::iterator it, st;
+    it = set_intersection(actual_cluster_1_points.begin(), actual_cluster_1_points.end(), cluster_1_points.begin(), cluster_2_points.end(), v.begin());
+
+    cout << "\nCommon elements between actual cluster 1 and formed cluster 1:\n";
+    for (st = v.begin(); st != it; ++st)
+    {
+        cout << *st << ", ";
+        match1++;
+    }
+
+    cout << '\n';
+}
 int main()
 {
     // read data from csv file
     read_csv_data("iris.txt");
 
-    // getting initial mean and covariance for gaussians before shuffling the data
+    int choice = 0;
 
-    initialize_gaussian_parameters_before_shuffle();
+    cout << "Enter choice" << endl;
+    cout << "1.Informed Gaussian component initialization" << endl;
+    cout << "2.Random Gaussian component initialization" << endl;
+    cin >> choice;
 
-    // shuffling the observations
-    shuffle_data();
+    if (choice == 1)
+    {
+        // getting initial mean and covariance for gaussians before shuffling the data
 
-    // getting initial mean and covariance for gaussians after shuffling the data
+        initialize_gaussian_parameters_before_shuffle();
 
-    // initializing the parameters of the gaussians randomly
+        // shuffling the observations
+        shuffle_data();
+    }
+    if (choice == 2)
+    {
+        // shuffling the observations
+        shuffle_data();
 
-    // initialize_gaussian_parameters_after_shuffle();
-    
+        // getting initial mean and covariance for gaussians after shuffling the data
+
+        // initializing the parameters of the gaussians randomly
+
+        initialize_gaussian_parameters_after_shuffle();
+    }
 
     for (int i = 0; i < iterations; i++)
     {
@@ -682,17 +724,89 @@ int main()
             next_log_likelihood = 0;
         }
     }
-    
+
     // cout<<actual_cluster.transpose()<<endl;
     get_allotted_cluster();
 
-    double sum_true_allocations = 0;
-    for (int i = 0; i < observation.rows(); i++)
+    if (choice == 1)
     {
-        if (allotted_cluster[i] == actual_cluster[i])
-            sum_true_allocations += 1;
+        double sum_true_allocations = 0;
+        for (int i = 0; i < observation.rows(); i++)
+        {
+            if (allotted_cluster[i] == actual_cluster[i])
+                sum_true_allocations += 1;
+        }
+        cout << "Data points that we allotted to their true clusters =  " << sum_true_allocations << endl;
     }
-    cout <<"Data points that we allotted to their true clusters =  "<<sum_true_allocations<<endl;
+    else
+    {
+        for (int i = 0; i < observation.rows(); i++)
+        {
+            if (allotted_cluster(i) == 0)
+                cluster_1_points.push_back(i);
+            else if (allotted_cluster(i) == 1)
+                cluster_2_points.push_back(i);
+            else
+                cluster_3_points.push_back(i);
+        }
+
+        for (int i = 0; i < observation.rows(); i++)
+        {
+            if (actual_cluster(i) == 0)
+                actual_cluster_1_points.push_back(i);
+            else if (actual_cluster(i) == 1)
+                actual_cluster_2_points.push_back(i);
+            else
+                actual_cluster_3_points.push_back(i);
+        }
+
+        cout << endl;
+        cout << "Data Points actually belonging to Iris-setosa" << endl;
+        for (int i = 0; i < actual_cluster_1_points.size(); i++)
+        {
+            cout << actual_cluster_1_points[i] << " ";
+        }
+        cout << endl;
+        cout << endl;
+        cout << "Data Points actually belonging to Iris-versicolor" << endl;
+        for (int i = 0; i < actual_cluster_2_points.size(); i++)
+        {
+            cout << actual_cluster_2_points[i] << " ";
+        }
+        cout << endl;
+        cout << endl;
+        cout << "Data Points actually belonging to Iris-virginica" << endl;
+        for (int i = 0; i < actual_cluster_3_points.size(); i++)
+        {
+            cout << actual_cluster_3_points[i] << " ";
+        }
+        cout << endl;
+        cout << endl;
+
+        cout << "Data Points allotted to component 1" << endl;
+        for (int i = 0; i < cluster_1_points.size(); i++)
+        {
+            cout << cluster_1_points[i] << " ";
+        }
+        cout << endl;
+        cout << endl;
+        cout << "Data Points allotted to component 2" << endl;
+        for (int i = 0; i < cluster_2_points.size(); i++)
+        {
+            cout << cluster_2_points[i] << " ";
+        }
+        cout << endl;
+        cout << endl;
+        cout << "Data Points allotted to component 3" << endl;
+        for (int i = 0; i < cluster_3_points.size(); i++)
+        {
+            cout << cluster_3_points[i] << " ";
+        }
+        cout << endl;
+        cout << endl;
+    }
+
+    // cout<<observation<<endl;
 
     return 0;
 }
